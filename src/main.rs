@@ -55,9 +55,8 @@ impl Enemy {
         (passed as f32 * weapon.health_multiplier) as u32
     }
 
-    fn kill(&self, distribution_cache: &DiceDistributionCache, weapon: &Weapon) -> i32 {
+    fn get_average_time_to_kill(&self, distribution_cache: &DiceDistributionCache, weapon: &Weapon) -> f32 {
         let distribution = distribution_cache.distribution_for(weapon.dice_count as usize);
-        let mut steps: i32 = 0;
         let mut average_damage: f32 = 0.0;
         for res in weapon.dice_count..=weapon.dice_count * 6 {
             let probability = distribution.probability_of(res as usize);
@@ -65,17 +64,12 @@ impl Enemy {
             average_damage += damage as f32 * probability;
         }
 
-        if average_damage.abs() < 0.1 {
-            steps = -400
+        let health = self.health as f32;
+        if average_damage.abs() < 0.1 || health > 300f32 * average_damage {
+            -400f32
         } else {
-            steps = (self.health as f32 / average_damage).round() as i32;
-
-            if steps > 300 {
-                steps = -400
-            }
+            (health / average_damage).round()
         }
-
-        steps
     }
 }
 
@@ -84,7 +78,7 @@ struct Sample {
     weapons: Vec<Weapon>,
     enemies: Vec<Enemy>,
 
-    score: u32,
+    score: f32,
 }
 
 impl Sample {
@@ -101,7 +95,7 @@ impl Sample {
                 .map(|_| Enemy::generate_random(random))
                 .collect(),
 
-            score: 0,
+            score: 0f32,
         }
     }
 }
@@ -207,12 +201,12 @@ fn main() {
     let mut best_sample: Sample = Sample {
         weapons: Vec::new(),
         enemies: Vec::new(),
-        score: 10000,
+        score: 10000f32,
     };
 
     let generation_number = 1;
 
-    while best_sample.score > 10 {
+    while best_sample.score > 10f32 {
         println!("Поколение {}", generation_number);
 
         let total_start = SystemTime::now();
@@ -220,19 +214,20 @@ fn main() {
         samples.iter_mut().for_each(|sample| {
             let start = SystemTime::now();
 
+            let mut total_error = 0f32;
+
             for (weapon_type, weapon) in sample.weapons.iter().enumerate() {
                 for (enemy_type, enemy) in sample.enemies.iter().enumerate() {
-                    let current_enemy: Enemy = enemy.clone();
-                    let current_time_to_kill = current_enemy.kill(&distributions_cache, &weapon);
+                    let current_time_to_kill = enemy.get_average_time_to_kill(&distributions_cache, &weapon);
 
-                    let perfect_time_to_kill = *perfect
-                        .get(&(weapon_type as u32, enemy_type as u32))
-                        .unwrap();
-                    let stat_error = (current_time_to_kill - perfect_time_to_kill).pow(2) as u32;
+                    let perfect_time_to_kill = perfect[&(weapon_type as u32, enemy_type as u32)];
+                    let stat_error = (current_time_to_kill - perfect_time_to_kill as f32).powi(2);
 
-                    sample.score += stat_error;
+                    total_error += stat_error;
                 }
             }
+
+            sample.score += total_error;
 
             let stop = SystemTime::now();
             println!("Done evaluating in {:?}", stop.duration_since(start));
