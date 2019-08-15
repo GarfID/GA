@@ -36,15 +36,6 @@ struct Enemy {
     armor: u32,
 }
 
-impl Default for Enemy {
-    fn default() -> Enemy {
-        Enemy {
-            health: 1,
-            armor: 1,
-        }
-    }
-}
-
 impl Enemy {
     fn generate_random(random: &mut ThreadRng) -> Enemy {
         Enemy {
