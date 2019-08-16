@@ -1,14 +1,17 @@
 extern crate rand;
 extern crate rayon;
 
+use std::io;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
 use rand::prelude::ThreadRng;
 use rand::Rng;
-use rayon::prelude::*;
+use std::mem;
+use rand::seq::index::sample;
+use std::process::exit;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Weapon {
     dice_count: u32,
     modifier: i32,
@@ -30,7 +33,7 @@ impl Weapon {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Enemy {
     health: u32,
     armor: u32,
@@ -73,7 +76,7 @@ impl Enemy {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Sample {
     weapons: Vec<Weapon>,
     enemies: Vec<Enemy>,
@@ -82,8 +85,70 @@ struct Sample {
 }
 
 impl Sample {
-    fn breed_with(&self, partner: &Sample) -> Sample {
-        unimplemented!()
+    fn breed_with(&self, random: &mut ThreadRng, partner: &Sample) -> Sample {
+        let mut child: Sample = self.clone();
+
+        for (index, _) in self.weapons.iter().enumerate() {
+            let mut weapon: Weapon = child.weapons.get(index).unwrap().clone();
+
+            if random.gen_bool(0.5) {
+                if random.gen_bool(0.01) {
+                    weapon.dice_count = random.gen_range(1, 26);
+                } else {
+                    weapon.dice_count = partner.weapons.get(index).unwrap().dice_count;
+                }
+            }
+            if random.gen_bool(0.5) {
+                if random.gen_bool(0.01) {
+                    weapon.modifier = random.gen_range(1, 13);
+                } else {
+                    weapon.modifier = partner.weapons.get(index).unwrap().modifier;
+                }
+            }
+            if random.gen_bool(0.5) {
+                if random.gen_bool(0.01) {
+                    let armor_multiplier_scale: u32 = random.gen_range(1, 21);
+
+                    weapon.armor_multiplier = armor_multiplier_scale as f32 * 0.1;
+                } else {
+                    weapon.armor_multiplier = partner.weapons.get(index).unwrap().armor_multiplier;
+                }
+            }
+            if random.gen_bool(0.5) {
+                if random.gen_bool(0.01) {
+                    let health_multiplier_scale: u32 = random.gen_range(1, 5);
+
+                    weapon.health_multiplier = health_multiplier_scale as f32 * 0.5;
+                } else {
+                    weapon.health_multiplier = partner.weapons.get(index).unwrap().health_multiplier;
+                }
+            }
+
+            child.weapons[index] = weapon.clone();
+        }
+
+        for (index, _) in self.enemies.iter().enumerate() {
+            let mut enemy: Enemy = child.enemies.get(index).unwrap().clone();
+
+            if random.gen_bool(0.5) {
+                if random.gen_bool(0.01) {
+                    enemy.health = random.gen_range(0, 101);
+                } else {
+                    enemy.health = partner.enemies.get(index).unwrap().health;
+                }
+            }
+            if random.gen_bool(0.5) {
+                if random.gen_bool(0.01) {
+                    enemy.armor = random.gen_range(0, 101);
+                } else {
+                    enemy.armor = partner.enemies.get(index).unwrap().armor;
+                }
+            }
+
+            child.enemies[index] = enemy.clone();
+        }
+
+        child
     }
 
     fn gen(random: &mut ThreadRng, weapon_count: u32, enemy_count: u32) -> Sample {
@@ -153,6 +218,8 @@ impl DiceDistributionCache {
 }
 
 fn main() {
+    const POPULATION_SIZE: u32 = 150;
+
     let distributions_cache = DiceDistributionCache::precomputed(26);
     let perfect_json = r#"{"Дробовик":{"Грант":9,"Титан":60,"Ховер":-400,"Громила":15,"Ремонтник":3,"Берсерк":15,"Гладиатор":30,"Банши":12,"Монстр":-400,"Надзиратель":6,"Брак":3,"Хаунд":21,"Турель":6,"Зомби":3,"Шмель":-400,"Дропер":-400,"Мясо":3,"Тактик":6,"Процессор":3,"Колобок":20},"Гвоздевик":{"Грант":7,"Титан":25,"Ховер":60,"Громила":10,"Ремонтник":1,"Берсерк":6,"Гладиатор":17,"Банши":5,"Монстр":40,"Надзиратель":4,"Брак":1,"Хаунд":13,"Турель":4,"Зомби":1,"Шмель":30,"Дропер":35,"Мясо":2,"Тактик":2,"Процессор":3,"Колобок":10},"Гипербластер":{"Грант":30,"Титан":80,"Ховер":220,"Громила":40,"Ремонтник":4,"Берсерк":18,"Гладиатор":60,"Банши":24,"Монстр":140,"Надзиратель":12,"Брак":2,"Хаунд":48,"Турель":12,"Зомби":2,"Шмель":125,"Дропер":110,"Мясо":4,"Тактик":8,"Процессор":12,"Колобок":50},"Клиповик":{"Грант":25,"Титан":0,"Ховер":0,"Громила":35,"Ремонтник":2,"Берсерк":12,"Гладиатор":57,"Банши":18,"Монстр":0,"Надзиратель":8,"Брак":2,"Хаунд":43,"Турель":8,"Зомби":1,"Шмель":0,"Дропер":0,"Мясо":3,"Тактик":5,"Процессор":8,"Колобок":20},"Бластер":{"Грант":-400,"Титан":-400,"Ховер":-400,"Громила":-400,"Ремонтник":5,"Берсерк":30,"Гладиатор":-400,"Банши":-400,"Монстр":-400,"Надзиратель":-400,"Брак":4,"Хаунд":-400,"Турель":-400,"Зомби":2,"Шмель":-400,"Дропер":-400,"Мясо":7,"Тактик":12,"Процессор":20,"Колобок":-400}}"#;
     let weapons_json =
@@ -188,7 +255,7 @@ fn main() {
         }
     }
 
-    let mut samples: Vec<Sample> = (0..500)
+    let mut samples: Vec<Sample> = (0..POPULATION_SIZE)
         .map(|_| {
             Sample::gen(
                 &mut rand::thread_rng(),
@@ -201,19 +268,15 @@ fn main() {
     let mut best_sample: Sample = Sample {
         weapons: Vec::new(),
         enemies: Vec::new(),
-        score: 10000f32,
+        score: 0f32,
     };
 
-    let generation_number = 1;
+    let mut generation_number = 1;
 
-    while best_sample.score > 10f32 {
-        println!("Поколение {}", generation_number);
-
-        let total_start = SystemTime::now();
+    while /*best_sample.score < 1f32*/ true {
+        let mut total_score: f32 = 0f32;
 
         samples.iter_mut().for_each(|sample| {
-            let start = SystemTime::now();
-
             let mut total_error = 0f32;
 
             for (weapon_type, weapon) in sample.weapons.iter().enumerate() {
@@ -227,14 +290,67 @@ fn main() {
                 }
             }
 
-            sample.score += total_error;
+            sample.score = 1f32 / total_error;
 
-            let stop = SystemTime::now();
-            println!("Done evaluating in {:?}", stop.duration_since(start));
+            total_score += sample.score;
         });
 
-        let total_stop = SystemTime::now();
+        let mut random = rand::thread_rng();
+        let mut temp_samples: Vec<Sample> = Vec::new();
 
-        //println!("Complete in {:?}", total_stop.duration_since(total_start));
+        samples.iter().for_each(|sample| {
+            if sample.score > total_score / POPULATION_SIZE as f32 {
+                if (sample.score - best_sample.score) > 0f32 {
+                    best_sample = sample.clone();
+                    temp_samples.push(sample.clone());
+
+                    println!("New best score {}", best_sample.score);
+                } else {
+                    let roulette_score = sample.score / total_score;
+
+                    let rand_float: f32 = random.gen_range(0f32, 1f32);
+
+                    if roulette_score > rand_float {
+                        temp_samples.push(sample.clone());
+                    }
+                }
+            }
+
+            total_score -= sample.score;
+        });
+
+        samples.push(best_sample.clone());
+        samples = temp_samples;
+
+        let lack = POPULATION_SIZE - samples.len() as u32;
+
+        let mut temp_samples = samples.clone();
+
+        if samples.len() > 1 {
+            for _ in 0..(lack as f32 * 0.1) as u32 {
+                let father: Sample = samples.get(random.gen_range(1, samples.len())).unwrap().clone();
+
+                let new_sample = best_sample.breed_with(&mut random.clone(), &father);
+                temp_samples.push(new_sample);
+            }
+
+            for _ in 0..(lack as f32 * 0.6) as u32 {
+                let mother: Sample = samples.get(random.gen_range(1, samples.len())).unwrap().clone();
+                let father: Sample = samples.get(random.gen_range(1, samples.len())).unwrap().clone();
+
+                let new_sample = mother.breed_with(&mut random.clone(), &father);
+                temp_samples.push(new_sample);
+            }
+        }
+
+
+        while temp_samples.len() < POPULATION_SIZE as usize {
+            let new_sample = Sample::gen(&mut random, weapon_types_vec.len() as u32, enemy_types_vec.len() as u32);
+            temp_samples.push(new_sample)
+        }
+
+        samples = temp_samples;
+
+        generation_number += 1;
     }
 }
