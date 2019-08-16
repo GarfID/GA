@@ -9,6 +9,9 @@
       <sourceFolder url="file://$MODULE_DIR$/../GA\examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../GA\tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/../GA\benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/../GA_git\examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../GA_git\tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/../GA_git\benches" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
